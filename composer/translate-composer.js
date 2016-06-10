@@ -45,6 +45,11 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
         writable: false
     },
 
+    _TOUCH_POINTER: {
+        value: "mouse",
+        writable: false
+    },
+
     CLAIM_POINTER_POLICIES: {
         value: {
             DEFAULT: "default", // claiming pointers on the capture phase. (first move event)
@@ -486,6 +491,16 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
         value: false
     },
 
+    _observedPointerType: {
+        get: function () {
+            if (this._observedPointer) {
+                return typeof this._observedPointer === "string" ? this._observedPointer : this._TOUCH_POINTER;
+            }
+
+            return null;
+        }
+    },
+
     listenToWheelEvent: {
         set: function (_listenToWheelEvent) {
             _listenToWheelEvent = !!_listenToWheelEvent;
@@ -552,14 +567,15 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
     },
 
     surrenderPointer: {
-        value: function () {
-            var isSurrender = true;
-
-            if (isSurrender && this.isMoving) {
-                this._releaseInterest();
+        value: function (pointer, component) {
+            var shouldSurrender = this.callDelegateMethod("surrenderPointer", pointer, component);
+            if (typeof shouldSurrender !== "undefined" && shouldSurrender === false) {
+                return false;
             }
 
-            return isSurrender;
+            this._cancel();
+
+            return true;
         }
     },
 
@@ -583,7 +599,7 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
         value: function (event) {
             if (event.pointerType === this._MOUSE_POINTER || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_MOUSE)) {
                 this.captureMousedown(event);
-            } else if (event.pointerType === "touch" || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_TOUCH)) {
+            } else if (event.pointerType === this._TOUCH_POINTER || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_TOUCH)) {
                 this.captureTouchstart(event);
             }
         }
@@ -593,7 +609,7 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
         value: function (event) {
             if (event.pointerType === this._MOUSE_POINTER || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_MOUSE)) {
                 this.captureMousemove(event);
-            } else if (event.pointerType === "touch" || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_TOUCH)) {
+            } else if (event.pointerType === this._TOUCH_POINTER || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_TOUCH)) {
                 this.captureTouchmove(event);
             }
         }
@@ -603,7 +619,7 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
         value: function (event) {
             if (event.pointerType === this._MOUSE_POINTER || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_MOUSE)) {
                 this.handleMouseup(event);
-            } else if (event.pointerType === "touch" || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_TOUCH)) {
+            } else if (event.pointerType === this._TOUCH_POINTER || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_TOUCH)) {
                 this.handleTouchend(event);
             }
         }
@@ -611,7 +627,7 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
 
     handlePointercancel: {
         value: function (event) {
-            if (event.pointerType === "touch" || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_TOUCH)) {
+            if (event.pointerType === this._TOUCH_POINTER || (window.MSPointerEvent && event.pointerType === window.MSPointerEvent.MSPOINTER_TYPE_TOUCH)) {
                 this.handleTouchcancel(event);
             }
         }
@@ -931,14 +947,20 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
                 deltaX,
                 deltaY;
 
-            if (event.type === "wheel") {
+            if (event.type === "wheel" || event.type === "mousewheel") {
                 if (this._axis !== "vertical") {
-                    deltaX = ((event.wheelDeltaY || -event.deltaY || 0) * 20) / 120;
+                    deltaX = ((event.wheelDeltaX || -event.deltaX || 0) * 20) / 120;
                 }
 
                 if (this._axis !== "horizontal") {
                     deltaY = ((event.wheelDeltaY || -event.deltaY || 0) * 20) / 120;
                 }
+
+                canMove = !(
+                    (this._axis === "horizontal" && deltaX === 0) ||
+                    (this._axis === "vertical" && deltaY === 0) ||
+                    (deltaX ===  0 && deltaY === 0)
+                );
 
             } else {
                 if (this._axis !== "vertical") {
@@ -950,40 +972,43 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
                 }
             }
 
-            if (deltaY) {
-                isNegativeDeltaY = this._isNegativeNumber(deltaY);
+            if (canMove) {
+                if (deltaY) {
+                    isNegativeDeltaY = this._isNegativeNumber(deltaY);
 
-                if (minTranslateY !== null) {
-                    // can moves if the current position is at the extreme top, but "scrolling" down or no extreme.
-                    canMove = translateY !== minTranslateY || (translateY === minTranslateY && isNegativeDeltaY);
+                    if (minTranslateY !== null) {
+                        // can moves if the current position is at the extreme top, but "scrolling" down or no extreme.
+                        canMove = translateY !== minTranslateY || (translateY === minTranslateY && isNegativeDeltaY);
+                    }
+
+
+                    if (maxTranslateY !== null) {
+                        if (canMove) {
+                            // can moves if the current position is at the extreme bottom, but "scrolling" up or no extreme.
+                            canMove = translateY !== maxTranslateY || (translateY === maxTranslateY && !isNegativeDeltaY);
+                        }
+                    }
                 }
 
+                if (deltaX) {
+                    isNegativeDeltaX = this._isNegativeNumber(deltaX);
 
-                if (maxTranslateY !== null) {
-                    if (canMove) {
-                        // can moves if the current position is at the extreme bottom, but "scrolling" up or no extreme.
-                        canMove = translateY !== maxTranslateY || (translateY === maxTranslateY && !isNegativeDeltaY);
+                    if (minTranslateX !== null) {
+                        if (canMove) {
+                            // can moves if the current position is at the extreme left, but "scrolling" right or no extreme.
+                            canMove = translateX !== minTranslateX || (translateX === minTranslateX && isNegativeDeltaX);
+                        }
+                    }
+
+                    if (maxTranslateX !== null) {
+                        if (canMove) {
+                            // can moves if the current position is at the extreme right, but "scrolling" left or no extreme.
+                            canMove = translateX !== maxTranslateX || (translateX === maxTranslateX && !isNegativeDeltaX);
+                        }
                     }
                 }
             }
 
-            if (deltaX) {
-                isNegativeDeltaX = this._isNegativeNumber(deltaX);
-
-                if (minTranslateX !== null) {
-                    if (canMove) {
-                        // can moves if the current position is at the extreme left, but "scrolling" right or no extreme.
-                        canMove = translateX !== minTranslateX || (translateX === minTranslateX && isNegativeDeltaX);
-                    }
-                }
-
-                if (maxTranslateX !== null) {
-                    if (canMove) {
-                        // can moves if the current position is at the extreme right, but "scrolling" left or no extreme.
-                        canMove = translateX !== maxTranslateX || (translateX === maxTranslateX && !isNegativeDeltaX);
-                    }
-                }
-            }
 
             return canMove;
         }
@@ -1215,13 +1240,23 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
 
             // If this composers' component is claiming the "wheel" pointer then handle the event
             if (this.eventManager.isPointerClaimedByComponent(this._WHEEL_POINTER, this)) {
+                this._observedPointer = this._WHEEL_POINTER;
+
                 if (this._translateEndTimeout) {
                     window.clearTimeout(this._translateEndTimeout);
                 } else {
                     this._dispatchTranslateStart();
                 }
 
-                this.translateY = this._translateY - ((event.wheelDeltaY || -event.deltaY || 0)* 20) / 120;
+
+                if (this.axis !== "vertical") {
+                    this.translateX = this._translateX - ((event.wheelDeltaX || -event.deltaX || 0)* 20) / 120;
+                }
+
+                if (this.axis !== "horizontal") {
+                    this.translateY = this._translateY - ((event.wheelDeltaY || -event.deltaY || 0)* 20) / 120;
+                }
+
                 this.isMoving = true;
                 this._dispatchTranslate();
 
@@ -1277,7 +1312,7 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
             translateStartEvent.translateY = y;
             // Event needs to be the same shape as the one in flow-translate-composer
             translateStartEvent.scroll = 0;
-            translateStartEvent.pointer = this._observedPointer;
+            translateStartEvent.pointer = this._observedPointerType;
             this.dispatchEvent(translateStartEvent);
         }
     },
@@ -1291,6 +1326,7 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
             translateEndEvent.translateY = this._translateY;
             // Event needs to be the same shape as the one in flow-translate-composer
             translateEndEvent.scroll = 0;
+            translateEndEvent.pointer = this._observedPointerType;
             this.dispatchEvent(translateEndEvent);
         }
     },
@@ -1304,6 +1340,7 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
             translateCancelEvent.translateY = this._translateY;
             // Event needs to be the same shape as the one in flow-translate-composer
             translateCancelEvent.scroll = 0;
+            translateCancelEvent.pointer = this._observedPointerType;
             this.dispatchEvent(translateCancelEvent);
         }
     },
@@ -1316,7 +1353,7 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
             translateEvent.translateY = this._translateY;
             // Event needs to be the same shape as the one in flow-translate-composer
             translateEvent.scroll = 0;
-            translateEvent.pointer = this._observedPointer;
+            translateEvent.pointer = this._observedPointerType;
             this.dispatchEvent(translateEvent);
         }
     },
