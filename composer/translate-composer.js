@@ -512,21 +512,39 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
         }
     },
 
+    _listenToPointerEvent: {
+        value: true
+    },
+
+    listenToPointerEvent: {
+        set: function (_listenToPointerEvent) {
+            _listenToPointerEvent = !!_listenToPointerEvent;
+
+            if (this._listenToPointerEvent !== _listenToPointerEvent) {
+                this._listenToPointerEvent = _listenToPointerEvent;
+
+                if (this._isLoaded) {
+                    if (_listenToPointerEvent) {
+                        this._addPointerEventListener();
+                    } else {
+                        this._removePointerEventListener();
+                    }
+                }
+            }
+        },
+        get: function () {
+            return this._listenToPointerEvent;
+        }
+    },
+
     _claimPointerPolicy: {
         value: null
     },
 
     load: {
         value: function () {
-            if (window.PointerEvent) {
-                this._element.addEventListener("pointerdown", this, true);
-
-            } else if (window.MSPointerEvent && window.navigator.msPointerEnabled) {
-                this._element.addEventListener("MSPointerDown", this, true);
-
-            } else {
-                this._element.addEventListener("touchstart", this, true);
-                this._element.addEventListener("mousedown", this, true);
+            if (this._listenToPointerEvent) {
+                this._addPointerEventListener();
             }
 
             if (this._listenToWheelEvent) {
@@ -539,15 +557,8 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
 
     unload: {
         value: function () {
-            if (window.PointerEvent) {
-                this._element.removeEventListener("pointerdown", this, true);
-
-            } else if (window.MSPointerEvent && window.navigator.msPointerEnabled) {
-                this._element.removeEventListener("MSPointerDown", this, true);
-
-            } else {
-                this._element.removeEventListener("touchstart", this, true);
-                this._element.removeEventListener("mousedown", this, true);
+            if (this._listenToPointerEvent) {
+                this._removePointerEventListener();
             }
 
             if (this._listenToWheelEvent) {
@@ -767,6 +778,36 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
         }
     },
 
+    _addPointerEventListener: {
+        value: function () {
+            if (window.PointerEvent) {
+                this._element.addEventListener("pointerdown", this, true);
+
+            } else if (window.MSPointerEvent && window.navigator.msPointerEnabled) {
+                this._element.addEventListener("MSPointerDown", this, true);
+
+            } else {
+                this._element.addEventListener("touchstart", this, true);
+                this._element.addEventListener("mousedown", this, true);
+            }
+        }
+    },
+
+    _removePointerEventListener: {
+        value: function () {
+            if (window.PointerEvent) {
+                this._element.removeEventListener("pointerdown", this, true);
+
+            } else if (window.MSPointerEvent && window.navigator.msPointerEnabled) {
+                this._element.removeEventListener("MSPointerDown", this, true);
+
+            } else {
+                this._element.removeEventListener("touchstart", this, true);
+                this._element.removeEventListener("mousedown", this, true);
+            }
+        }
+    },
+
     _addWheelEventListener: {
         value: function () {
             if (this._element) {
@@ -803,29 +844,31 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
             this._pointerX = x;
             this._pointerY = y;
 
-            if (window.PointerEvent) {
-                this._element.addEventListener("pointerdown", this, false);
-                document.addEventListener("pointermove", this, true);
-                document.addEventListener("pointerup", this, false);
-                document.addEventListener("pointercancel", this, false);
+            if (this._listenToPointerEvent) {
+                if (window.PointerEvent) {
+                    this._element.addEventListener("pointerdown", this, false);
+                    document.addEventListener("pointermove", this, true);
+                    document.addEventListener("pointerup", this, false);
+                    document.addEventListener("pointercancel", this, false);
 
-            } else if (window.MSPointerEvent && window.navigator.msPointerEnabled) {
-                this._element.addEventListener("MSPointerDown", this, false);
-                document.addEventListener("MSPointerMove", this, true);
-                document.addEventListener("MSPointerUp", this, false);
-                document.addEventListener("MSPointerCancel", this, false);
-
-            } else {
-                if (this._observedPointer === this._MOUSE_POINTER) {
-                    this._element.addEventListener("mousedown", this, false);
-                    document.addEventListener("mousemove", this, true);
-                    document.addEventListener("mouseup", this, false);
+                } else if (window.MSPointerEvent && window.navigator.msPointerEnabled) {
+                    this._element.addEventListener("MSPointerDown", this, false);
+                    document.addEventListener("MSPointerMove", this, true);
+                    document.addEventListener("MSPointerUp", this, false);
+                    document.addEventListener("MSPointerCancel", this, false);
 
                 } else {
-                    this._element.addEventListener("touchstart", this, false);
-                    this._element.addEventListener("touchmove", this, true);
-                    this._element.addEventListener("touchend", this, false);
-                    this._element.addEventListener("touchcancel", this, false);
+                    if (this._observedPointer === this._MOUSE_POINTER) {
+                        this._element.addEventListener("mousedown", this, false);
+                        document.addEventListener("mousemove", this, true);
+                        document.addEventListener("mouseup", this, false);
+
+                    } else {
+                        this._element.addEventListener("touchstart", this, false);
+                        this._element.addEventListener("touchmove", this, true);
+                        this._element.addEventListener("touchend", this, false);
+                        this._element.addEventListener("touchcancel", this, false);
+                    }
                 }
             }
 
@@ -1100,29 +1143,31 @@ var TranslateComposer = exports.TranslateComposer = Composer.specialize(/** @len
 
     _releaseInterest: {
         value: function () {
-            if (window.PointerEvent) {
-                this._element.removeEventListener("pointerdown", this, false);
-                document.removeEventListener("pointermove", this, true);
-                document.removeEventListener("pointerup", this, false);
-                document.removeEventListener("pointercancel", this, false);
+            if (this._listenToPointerEvent) {
+                if (window.PointerEvent) {
+                    this._element.removeEventListener("pointerdown", this, false);
+                    document.removeEventListener("pointermove", this, true);
+                    document.removeEventListener("pointerup", this, false);
+                    document.removeEventListener("pointercancel", this, false);
 
-            } else if (window.MSPointerEvent && window.navigator.msPointerEnabled) {
-                this._element.removeEventListener("MSPointerDown", this, false);
-                document.removeEventListener("MSPointerMove", this, true);
-                document.removeEventListener("MSPointerUp", this, false);
-                document.removeEventListener("MSPointerCancel", this, false);
-
-            } else {
-                if (this._observedPointer === this._MOUSE_POINTER) {
-                    this._element.removeEventListener("mousedown", this, false);
-                    document.removeEventListener("mousemove", this, true);
-                    document.removeEventListener("mouseup", this, false);
+                } else if (window.MSPointerEvent && window.navigator.msPointerEnabled) {
+                    this._element.removeEventListener("MSPointerDown", this, false);
+                    document.removeEventListener("MSPointerMove", this, true);
+                    document.removeEventListener("MSPointerUp", this, false);
+                    document.removeEventListener("MSPointerCancel", this, false);
 
                 } else {
-                    this._element.removeEventListener("touchstart", this, false);
-                    this._element.removeEventListener("touchmove", this, true);
-                    this._element.removeEventListener("touchend", this, false);
-                    this._element.removeEventListener("touchcancel", this, false);
+                    if (this._observedPointer === this._MOUSE_POINTER) {
+                        this._element.removeEventListener("mousedown", this, false);
+                        document.removeEventListener("mousemove", this, true);
+                        document.removeEventListener("mouseup", this, false);
+
+                    } else {
+                        this._element.removeEventListener("touchstart", this, false);
+                        this._element.removeEventListener("touchmove", this, true);
+                        this._element.removeEventListener("touchend", this, false);
+                        this._element.removeEventListener("touchcancel", this, false);
+                    }
                 }
             }
 
