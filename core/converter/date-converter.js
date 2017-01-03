@@ -2560,7 +2560,7 @@ var DateConverter = exports.DateConverter = Converter.specialize(/** @lends Date
     convert: {
         value: function (v) {
             var t = typeof v;
-            if (isDate(v) || t === "string" || t === "number") {
+            if (isDate(v) || (t === "string" && v.length) || t === "number") {
                 return formatDate(v, this.pattern);
             }
             return v;
