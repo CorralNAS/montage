@@ -256,6 +256,7 @@ var DocumentResources = Montage.specialize({
 
     normalizeUrl: {
         value: function (url, baseUrl) {
+            url += '?_v=' + window._FREENAS_GIT_SHA;
             if (!baseUrl) {
                 baseUrl = this._document.location.href;
             }
