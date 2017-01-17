@@ -428,7 +428,7 @@ var Template = Montage.specialize( /** @lends Template# */ {
 
             for (var i = 0, ii = nodes.length; i < ii; i++) {
                 fragment.appendChild(
-                    targetDocument.importNode(nodes[i], true)
+                    targetDocument.importNode(nodes[i], true).cloneNode(true)
                 );
             }
 
