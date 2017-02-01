@@ -288,7 +288,6 @@ var Button = exports.Button = Control.specialize(/** @lends module:"montage/ui/n
         value: function (event) {
             if (!this._promise){
                 this.active = false;
-                this.focus();
                 this._dispatchActionEvent();
                 this._removeEventListeners();
             }
