@@ -424,7 +424,11 @@ if (!String.prototype.endsWith) {
                                 reverseReelExpression,
                                 reverseReelFunction
                             );
-                            object._montage_metadata = new MontageMetaData(require,id,name);
+
+                            Object.defineProperty(object, '_montage_metadata', {
+                                value: new MontageMetaData(require,id,name),
+                                enumerable: false
+                            });
                         }
                     }
                 }
